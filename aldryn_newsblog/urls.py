@@ -3,23 +3,38 @@ from django.conf.urls import patterns, url
 from aldryn_newsblog.views import (
     ArticleDetail, ArticleList, AuthorArticleList, CategoryArticleList,
     YearArticleList, MonthArticleList, DayArticleList, TagArticleList,
-    ArticleSearchResultsList)
+    ArticleSearchResultsList, ArticleListInnerPage,
+    ArticleSearchResultsListInnerPage, YearArticleListInnerPage,
+    MonthArticleListInnerPage, DayArticleListInnerPage,
+    AuthorArticleListInnerPage, TagArticleListInnerPage,
+    CategoryArticleListInnerPage)
 from aldryn_newsblog.feeds import LatestArticlesFeed, TagFeed, CategoryFeed
 
 urlpatterns = [
     url(r'^$',
         ArticleList.as_view(), name='article-list'),
+    url(r'^page/(?P<page>\d+)/$',
+        ArticleListInnerPage.as_view(), name='article-list-page'),
+
     url(r'^feed/$', LatestArticlesFeed(), name='article-list-feed'),
 
     url(r'^search/$',
         ArticleSearchResultsList.as_view(), name='article-search'),
+    url(r'^search/page/(?P<page>\d+)/$',
+        ArticleSearchResultsListInnerPage.as_view(), name='article-search-page'),
 
     url(r'^(?P<year>\d{4})/$',
         YearArticleList.as_view(), name='article-list-by-year'),
+    url(r'^(?P<year>\d{4})/page/(?P<page>\d+)/$',
+        YearArticleListInnerPage.as_view(), name='article-list-by-year-page'),
     url(r'^(?P<year>\d{4})/(?P<month>\d{1,2})/$',
         MonthArticleList.as_view(), name='article-list-by-month'),
+    url(r'^(?P<year>\d{4})/(?P<month>\d{1,2})/page/(?P<page>\d+)/$',
+        MonthArticleListInnerPage.as_view(), name='article-list-by-month-page'),
     url(r'^(?P<year>\d{4})/(?P<month>\d{1,2})/(?P<day>\d{1,2})/$',
         DayArticleList.as_view(), name='article-list-by-day'),
+    url(r'^(?P<year>\d{4})/(?P<month>\d{1,2})/(?P<day>\d{1,2})/page/(?P<page>\d+)/$',
+        DayArticleListInnerPage.as_view(), name='article-list-by-day-page'),
 
     # Various permalink styles that we support
     # ----------------------------------------
@@ -41,14 +56,20 @@ urlpatterns = [
 
     url(r'^author/(?P<author>\w[-\w]*)/$',
         AuthorArticleList.as_view(), name='article-list-by-author'),
+    url(r'^author/(?P<author>\w[-\w]*)/page/(?P<page>\d+)/$',
+        AuthorArticleListInnerPage.as_view(), name='article-list-by-author-page'),
 
     url(r'^category/(?P<category>\w[-\w]*)/$',
         CategoryArticleList.as_view(), name='article-list-by-category'),
+    url(r'^category/(?P<category>\w[-\w]*)/page/(?P<page>\d+)/$',
+        CategoryArticleListInnerPage.as_view(), name='article-list-by-category-page'),
     url(r'^category/(?P<category>\w[-\w]*)/feed/$',
         CategoryFeed(), name='article-list-by-category-feed'),
 
     url(r'^tag/(?P<tag>\w[-\w]*)/$',
         TagArticleList.as_view(), name='article-list-by-tag'),
+    url(r'^tag/(?P<tag>\w[-\w]*)/page/(?P<page>\d+)/$',
+        TagArticleListInnerPage.as_view(), name='article-list-by-tag-page'),
     url(r'^tag/(?P<tag>\w[-\w]*)/feed/$',
         TagFeed(), name='article-list-by-tag-feed'),
 

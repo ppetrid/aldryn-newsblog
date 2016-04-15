@@ -2,6 +2,8 @@
 
 from __future__ import unicode_literals
 
+import re
+
 from datetime import datetime, date
 from dateutil.relativedelta import relativedelta
 
@@ -43,6 +45,49 @@ class TemplatePrefixMixin(object):
     def get_template_names(self):
         template_names = super(TemplatePrefixMixin, self).get_template_names()
         return self.prefix_template_names(template_names)
+
+
+class PaginationLinkTypeMixin(object):
+    """ A mixin that handles the pagination link type preference """
+    # Whether this view is a first page view (e.g. /myslug/)
+    # or an inner view (e.g. /myslug/page/2/)
+    inner_page_view = False
+
+    def get(self, request, *args, **kwargs):
+        if self.inner_page_view:
+            # if this is an inner page and we
+            # have selected a parameter-based pagination
+            # a page not found error should be raised
+            if self.config.pagination_link_type == 'param':
+                raise Http404
+
+            try:
+                page = int(kwargs.get(self.page_kwarg))
+            except:
+                page = 1
+
+            # this is an inner page view and the user
+            # tries to visit the first page.
+            # he should be redirected to the outer view
+            if page == 1:
+                return HttpResponsePermanentRedirect(
+                    re.sub('/page/(\d+)/$', '/', request.path)
+                )
+
+        return super(PaginationLinkTypeMixin, self) \
+                .get(request, *args, **kwargs)
+
+    def paginate_queryset(self, queryset, page_size):
+        if not self.inner_page_view:
+            if self.config.pagination_link_type == 'url':
+                # ensure the `page` parameter is ignored
+                # and we always get the first page 
+                self.page_kwarg = ''
+            else:
+                self.page_kwarg = 'page'
+
+        return super(PaginationLinkTypeMixin, self) \
+                .paginate_queryset(queryset, page_size)
 
 
 class EditModeMixin(object):
@@ -184,7 +229,8 @@ class ArticleDetail(AppConfigMixin, AppHookCheckMixin, PreviewModeMixin,
 
 
 class ArticleListBase(AppConfigMixin, AppHookCheckMixin, TemplatePrefixMixin,
-                      PreviewModeMixin, ViewUrlMixin, ListView):
+                      PreviewModeMixin, ViewUrlMixin, PaginationLinkTypeMixin,
+                      ListView):
     model = Article
     show_header = False
 
@@ -227,6 +273,10 @@ class ArticleListBase(AppConfigMixin, AppHookCheckMixin, TemplatePrefixMixin,
 class ArticleList(ArticleListBase):
     """A complete list of articles."""
     show_header = True
+
+
+class ArticleListInnerPage(ArticleList):
+    inner_page_view = True
 
 
 class ArticleSearchResultsList(ArticleListBase):
@@ -275,6 +325,10 @@ class ArticleSearchResultsList(ArticleListBase):
         return self.prefix_template_names(template_names)
 
 
+class ArticleSearchResultsListInnerPage(ArticleSearchResultsList):
+    inner_page_view = True
+
+
 class AuthorArticleList(ArticleListBase):
     """A list of articles written by a specific author."""
     def get_queryset(self):
@@ -284,18 +338,22 @@ class AuthorArticleList(ArticleListBase):
             author=self.author
         )
 
-    def get(self, request, author):
+    def get(self, request, author, **kwargs):
         language = translation.get_language_from_request(
             request, check_path=True)
         self.author = Person.objects.language(language).active_translations(
             language, slug=author).first()
         if not self.author:
             raise Http404('Author not found')
-        return super(AuthorArticleList, self).get(request)
+        return super(AuthorArticleList, self).get(request, **kwargs)
 
     def get_context_data(self, **kwargs):
         kwargs['newsblog_author'] = self.author
         return super(AuthorArticleList, self).get_context_data(**kwargs)
+
+
+class AuthorArticleListInnerPage(AuthorArticleList):
+    inner_page_view = True
 
 
 class CategoryArticleList(ArticleListBase):
@@ -305,16 +363,20 @@ class CategoryArticleList(ArticleListBase):
             categories=self.category
         )
 
-    def get(self, request, category):
+    def get(self, request, category, **kwargs):
         self.category = get_object_or_404(
             Category, translations__slug=category)
-        return super(CategoryArticleList, self).get(request)
+        return super(CategoryArticleList, self).get(request, **kwargs)
 
     def get_context_data(self, **kwargs):
         kwargs['newsblog_category'] = self.category
         ctx = super(CategoryArticleList, self).get_context_data(**kwargs)
         ctx['newsblog_category'] = self.category
         return ctx
+
+
+class CategoryArticleListInnerPage(CategoryArticleList):
+    inner_page_view = True
 
 
 class TagArticleList(ArticleListBase):
@@ -324,13 +386,17 @@ class TagArticleList(ArticleListBase):
             tags=self.tag
         )
 
-    def get(self, request, tag):
+    def get(self, request, tag, **kwargs):
         self.tag = get_object_or_404(Tag, slug=tag)
-        return super(TagArticleList, self).get(request)
+        return super(TagArticleList, self).get(request, **kwargs)
 
     def get_context_data(self, **kwargs):
         kwargs['newsblog_tag'] = self.tag
         return super(TagArticleList, self).get_context_data(**kwargs)
+
+
+class TagArticleListInnerPage(TagArticleList):
+    inner_page_view = True
 
 
 class DateRangeArticleList(ArticleListBase):
@@ -347,7 +413,7 @@ class DateRangeArticleList(ArticleListBase):
 
     def get(self, request, **kwargs):
         self.date_from, self.date_to = self._daterange_from_kwargs(kwargs)
-        return super(DateRangeArticleList, self).get(request)
+        return super(DateRangeArticleList, self).get(request, **kwargs)
 
     def get_context_data(self, **kwargs):
         kwargs['newsblog_day'] = (
@@ -371,11 +437,19 @@ class YearArticleList(DateRangeArticleList):
         return date_from, date_to
 
 
+class YearArticleListInnerPage(YearArticleList):
+    inner_page_view = True
+
+
 class MonthArticleList(DateRangeArticleList):
     def _daterange_from_kwargs(self, kwargs):
         date_from = datetime(int(kwargs['year']), int(kwargs['month']), 1)
         date_to = date_from + relativedelta(months=1)
         return date_from, date_to
+
+
+class MonthArticleListInnerPage(MonthArticleList):
+    inner_page_view = True
 
 
 class DayArticleList(DateRangeArticleList):
@@ -384,3 +458,7 @@ class DayArticleList(DateRangeArticleList):
             int(kwargs['year']), int(kwargs['month']), int(kwargs['day']))
         date_to = date_from + relativedelta(days=1)
         return date_from, date_to
+
+
+class DayArticleListInnerPage(DayArticleList):
+    inner_page_view = True

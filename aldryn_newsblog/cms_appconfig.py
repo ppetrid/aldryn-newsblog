@@ -30,6 +30,11 @@ NON_PERMALINK_HANDLING = (
     (404, _('Return 404: Not Found')),
 )
 
+PAGINATION_LINK_CHOICES = (
+    ('param', _('URL parameter (slug/?page=2)')),
+    ('url', _('Permalink (slug/page/2/)')),
+)
+
 # TODO override default if support for Django 1.6 will be dropped
 TEMPLATE_PREFIX_CHOICES = getattr(
     settings, 'ALDRYN_NEWSBLOG_TEMPLATE_PREFIXES', [])
@@ -73,6 +78,11 @@ class NewsBlogConfig(TranslatableModel, AppHookConfig):
         help_text=_('When grouping page numbers, this determines how many '
                     'pages are visible on each side of the active page.'),
     )
+
+    pagination_link_type = models.CharField(_('pagination permalink type'),
+        max_length=5, blank=False, default='param',
+        choices=PAGINATION_LINK_CHOICES,
+        help_text=_('Choose the style of urls to use for the pagination.'))
 
     template_prefix = models.CharField(
         max_length=20,
