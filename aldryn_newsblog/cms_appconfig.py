@@ -31,8 +31,8 @@ NON_PERMALINK_HANDLING = (
 )
 
 PAGINATION_LINK_CHOICES = (
-    ('param', _('URL parameter (slug/?page=2)')),
-    ('url', _('Permalink (slug/page/2/)')),
+    ('param', _('URL parameter (e.g. "my-slug/?page=2")')),
+    ('url', _('Permalink (e.g. "my-slug/page/2/")')),
 )
 
 # TODO override default if support for Django 1.6 will be dropped
@@ -83,6 +83,17 @@ class NewsBlogConfig(TranslatableModel, AppHookConfig):
         max_length=5, blank=False, default='param',
         choices=PAGINATION_LINK_CHOICES,
         help_text=_('Choose the style of urls to use for the pagination.'))
+
+    exclude_featured = models.PositiveSmallIntegerField(
+        _('Excluded featured articles count'),
+        blank=True,
+        default=0,
+        help_text=_(
+            'If you are using the Featured Articles plugin on the article list '
+            'view, you may prefer to exclude featured articles from the '
+            'article list itself to avoid duplicates. To do this, enter the '
+            'same number here as in your Featured Articles plugin.'),
+    )
 
     template_prefix = models.CharField(
         max_length=20,
