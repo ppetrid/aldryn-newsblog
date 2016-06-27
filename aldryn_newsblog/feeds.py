@@ -2,6 +2,8 @@
 
 from django.contrib.sites.models import Site
 from django.contrib.syndication.views import Feed
+from easy_thumbnails.files import get_thumbnailer
+
 try:
     from django.contrib.sites.shortcuts import get_current_site
 except ImportError:
@@ -17,14 +19,14 @@ from aldryn_newsblog.utils.utilities import get_valid_languages
 
 
 class LatestArticlesFeed(Feed):
-
     def __call__(self, request, *args, **kwargs):
         self.namespace, self.config = get_app_instance(request)
-        language = get_language_from_request(request)
+        self.scheme = request.scheme
+        self.language = get_language_from_request(request, check_path=True)
         site_id = getattr(get_current_site(request), 'id', None)
         self.valid_languages = get_valid_languages(
             self.namespace,
-            language_code=language,
+            language_code=self.language,
             site_id=site_id)
         return super(LatestArticlesFeed, self).__call__(
             request, *args, **kwargs)
@@ -36,8 +38,11 @@ class LatestArticlesFeed(Feed):
         return _('Articles on {0}').format(Site.objects.get_current().name)
 
     def get_queryset(self):
-        qs = Article.objects.published().namespace(self.namespace).translated(
-            *self.valid_languages)
+        qs = Article.objects.published() \
+            .translated(*self.valid_languages) \
+            .active_translations(self.language) \
+            .namespace(self.namespace)
+
         return qs
 
     def items(self, obj):
@@ -48,10 +53,50 @@ class LatestArticlesFeed(Feed):
         return item.title
 
     def item_description(self, item):
-        return item.lead_in
+        return '%s%s%s' % (self.item_image(item),
+                         item.lead_in,
+                         self.item_original(item))
 
     def item_pubdate(self, item):
         return item.publishing_date
+
+    def item_image(self, item):
+        if not item.featured_image:
+            return ''
+
+        thumbnailer = get_thumbnailer(item.featured_image)
+        try:
+            thumb = thumbnailer.get_thumbnail({
+                    'crop': True,
+                    'size': (767, 337),
+                    'subject_location': item.featured_image.subject_location
+            })
+        except:
+            return ''
+
+        return '<img width="747" height="345" ' \
+                'src="%s://%s%s" alt="%s" style="display: block; ' \
+                'margin-bottom: 10px;" />' % (
+                    self.scheme,
+                    Site.objects.get_current().domain, 
+                    thumb.url,
+                    item.title
+                )
+
+    def item_original(self, item):
+        return '<p>%s</p>' % \
+            _('The post <a href="%(scheme)s://' \
+              '%(domain)s%(post_url)s" title="%(post_title)s">' \
+              '%(post_title)s</a> appeared first on ' \
+              '<a href="%(scheme)s://%(domain)s%(blog_url)s '\
+              'title="%(site_title)s blog">%(site_title)s blog</a>') % {
+                    'scheme': self.scheme,
+                    'domain': Site.objects.get_current().domain,
+                    'post_url': item.get_absolute_url(),
+                    'post_title': item.title,
+                    'blog_url': reverse('%s:article-list' % self.namespace),
+                    'site_title': Site.objects.get_current().name
+            }
 
 
 class TagFeed(LatestArticlesFeed):
