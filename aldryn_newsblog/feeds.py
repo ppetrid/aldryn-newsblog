@@ -74,7 +74,7 @@ class LatestArticlesFeed(Feed):
         except:
             return ''
 
-        return '<img width="747" height="345" ' \
+        return '<img width="383" height="168" ' \
                 'src="%s://%s%s" alt="%s" style="padding: 0 10px ' \
                 '10px 0;" />' % (
                     self.scheme,
