@@ -68,15 +68,15 @@ class LatestArticlesFeed(Feed):
         try:
             thumb = thumbnailer.get_thumbnail({
                     'crop': True,
-                    'size': (767, 337),
+                    'size': (383, 168),
                     'subject_location': item.featured_image.subject_location
             })
         except:
             return ''
 
         return '<img width="747" height="345" ' \
-                'src="%s://%s%s" alt="%s" style="display: block; ' \
-                'margin-bottom: 10px;" />' % (
+                'src="%s://%s%s" alt="%s" style="padding: 0 10px ' \
+                '10px 0; />' % (
                     self.scheme,
                     Site.objects.get_current().domain, 
                     thumb.url,
