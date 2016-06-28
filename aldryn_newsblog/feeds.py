@@ -76,7 +76,7 @@ class LatestArticlesFeed(Feed):
 
         return '<img width="747" height="345" ' \
                 'src="%s://%s%s" alt="%s" style="padding: 0 10px ' \
-                '10px 0; />' % (
+                '10px 0;" />' % (
                     self.scheme,
                     Site.objects.get_current().domain, 
                     thumb.url,
