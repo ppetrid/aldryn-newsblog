@@ -88,7 +88,7 @@ class LatestArticlesFeed(Feed):
             _('The post <a href="%(scheme)s://' \
               '%(domain)s%(post_url)s" title="%(post_title)s">' \
               '%(post_title)s</a> appeared first on ' \
-              '<a href="%(scheme)s://%(domain)s%(blog_url)s '\
+              '<a href="%(scheme)s://%(domain)s%(blog_url)s" '\
               'title="%(site_title)s blog">%(site_title)s blog</a>') % {
                     'scheme': self.scheme,
                     'domain': Site.objects.get_current().domain,
