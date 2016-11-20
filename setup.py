@@ -25,6 +25,7 @@ REQUIREMENTS = [
     'pytz',
     'six',
     'python-dateutil',
+    'html5lib<0.99999999'
 ]
 
 # https://pypi.python.org/pypi?%3Aaction=list_classifiers
