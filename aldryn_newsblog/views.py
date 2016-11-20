@@ -12,7 +12,8 @@ from django.http import (
     Http404,
     HttpResponseRedirect,
     HttpResponsePermanentRedirect,
-)
+    HttpResponse
+) 
 from django.shortcuts import get_object_or_404
 from django.utils import translation
 from django.views.generic import ListView
@@ -22,13 +23,33 @@ from menus.utils import set_language_changer
 from parler.views import TranslatableSlugMixin, ViewUrlMixin
 from taggit.models import Tag
 
+from cms.utils.conf import get_cms_setting
+
 from aldryn_apphooks_config.mixins import AppConfigMixin
 from aldryn_categories.models import Category
 from aldryn_people.models import Person
 
 from aldryn_newsblog.utils.utilities import get_valid_languages_from_request
+from .cache import set_blog_page_cache, get_blog_page_cache
 from .models import Article
 from .utils import add_prefix_to_path
+
+
+class BlogCacheMixin(object):
+    def get_cached_blog_page(self):
+        if get_cms_setting("PAGE_CACHE") and (
+            not hasattr(self.request, 'toolbar') or (
+                not self.request.toolbar.edit_mode and
+                not self.request.toolbar.show_toolbar and
+                not self.request.user.is_authenticated()
+            )
+        ):
+            cache_content = get_blog_page_cache(self.request)
+            if cache_content is not None:
+                content, headers = cache_content
+                response = HttpResponse(content)
+                response._headers = headers
+                return response
 
 
 class TemplatePrefixMixin(object):
@@ -135,7 +156,7 @@ class AppHookCheckMixin(object):
         return qs.translated(*self.valid_languages)
 
 
-class ArticleDetail(AppConfigMixin, AppHookCheckMixin, PreviewModeMixin,
+class ArticleDetail(BlogCacheMixin, AppConfigMixin, AppHookCheckMixin, PreviewModeMixin,
                     TranslatableSlugMixin, TemplatePrefixMixin, DetailView):
     model = Article
     slug_field = 'slug'
@@ -150,13 +171,20 @@ class ArticleDetail(AppConfigMixin, AppHookCheckMixin, PreviewModeMixin,
         This handles non-permalinked URLs according to preferences as set in
         NewsBlogConfig.
         """
+        cached_response = self.get_cached_blog_page()
+        if cached_response:
+            return cached_response
+
         if not hasattr(self, 'object'):
             self.object = self.get_object()
         set_language_changer(request, self.object.get_absolute_url)
         url = self.object.get_absolute_url()
         if (self.config.non_permalink_handling == 200 or request.path == url):
             # Continue as normal
-            return super(ArticleDetail, self).get(request, *args, **kwargs)
+            response = super(ArticleDetail, self).get(request, *args, **kwargs)
+            # cache the response
+            response.add_post_render_callback(set_blog_page_cache)
+            return response
 
         # Check to see if the URL path matches the correct absolute_url of
         # the found object
@@ -270,7 +298,21 @@ class ArticleListBase(AppConfigMixin, AppHookCheckMixin, TemplatePrefixMixin,
         return context
 
 
-class ArticleList(ArticleListBase):
+class ArticleListCachedMixin(BlogCacheMixin):
+    def get(self, request, *args, **kwargs):
+        """ Retrieved cached response. """
+        cached_response = self.get_cached_blog_page()
+        if cached_response:
+            return cached_response
+
+        response = super(ArticleListCachedMixin, self).get(request, *args, **kwargs)
+        # do not cache param-style paginated pages
+        if self.config.pagination_link_type == 'url':
+            response.add_post_render_callback(set_blog_page_cache)
+        return response
+
+
+class ArticleList(ArticleListCachedMixin, ArticleListBase):
     """A complete list of articles."""
     show_header = True
 
@@ -369,7 +411,7 @@ class AuthorArticleListInnerPage(AuthorArticleList):
     inner_page_view = True
 
 
-class CategoryArticleList(ArticleListBase):
+class CategoryArticleList(ArticleListCachedMixin, ArticleListBase):
     """A list of articles filtered by categories."""
     def get_queryset(self):
         return super(CategoryArticleList, self).get_queryset().filter(
@@ -392,7 +434,7 @@ class CategoryArticleListInnerPage(CategoryArticleList):
     inner_page_view = True
 
 
-class TagArticleList(ArticleListBase):
+class TagArticleList(ArticleListCachedMixin, ArticleListBase):
     """A list of articles filtered by tags."""
     def get_queryset(self):
         return super(TagArticleList, self).get_queryset().filter(
@@ -412,7 +454,7 @@ class TagArticleListInnerPage(TagArticleList):
     inner_page_view = True
 
 
-class DateRangeArticleList(ArticleListBase):
+class DateRangeArticleList(ArticleListCachedMixin, ArticleListBase):
     """A list of articles for a specific date range"""
     def get_queryset(self):
         return super(DateRangeArticleList, self).get_queryset().filter(
